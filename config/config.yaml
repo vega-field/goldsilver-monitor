@@ -1,0 +1,26 @@
+# サンプル設定ファイル（必要に応じてフィールドを追加）
+data_sources:
+  yahoo:
+    enabled: true
+    tickers:
+      - "GC=F"   # Gold futures (Yahoo)
+      - "SI=F"   # Silver futures (Yahoo)
+    interval: "1d"
+  fred:
+    enabled: false
+    series:
+      - "GS10"
+
+analyzers:
+  fragility:
+    window_days: 30
+    volatility_window: 14
+    threshold:
+      warning: 0.7
+      critical: 0.9
+
+alerts:
+  obsidian:
+    enabled: true
+    vault_path: "${OBSIDIAN_VAULT_PATH:-}"
+    notes_dir: "goldsilver-alerts"
