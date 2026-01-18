@@ -1,4 +1,4 @@
-# 金銀市場脆弱性監視システム
+# 金銀市場脆弱性監視システム (Gold-Silver Vulnerability Monitor)
 
 ニクソンショック（1971年）以降の金銀比価を監視し、市場構造の脆弱性を検知するシステム。
 
@@ -10,6 +10,7 @@
 - **Obsidian連携**: 日次レポートをMarkdown形式で自動生成
 - **拡張可能設計**: 後からCFTC、ETFフロー等のデータソース追加が容易
 - **自動メンテナンス**: データローテーション、バックアップ、最適化を自動実行
+- **Azure AI Foundry統合**: Azure OpenAI Serviceを活用した高度な分析機能（オプション）
 
 ## システム構成
 
@@ -31,9 +32,49 @@
 - 複合シグナル検知
 ```
 
+## Azure AI Foundry統合（オプション）
+
+本システムは、Azure AI Foundryとの統合により、以下の高度な分析機能を提供できます：
+
+### 統合機能
+
+1. **自然言語レポート生成**
+   - 分析結果を平易な日本語で解説
+   - 市場状況の文脈的解釈
+   - 投資家向けインサイト生成
+
+2. **高度なパターン認識**
+   - GPT-4を活用した複雑な市場パターンの識別
+   - 過去の類似局面の自動検索
+   - 因果関係の推論
+
+3. **リスクシナリオ生成**
+   - 現在の脆弱性から想定されるシナリオ
+   - 確率的リスク評価
+   - ストレステスト
+
+### セットアップ（Azure統合版）
+
+```yaml
+# config/config.yaml に追加
+azure_ai:
+  enabled: true
+  endpoint: https://your-resource.openai.azure.com/
+  api_key: ${AZURE_OPENAI_API_KEY}
+  deployment_name: gpt-4
+  api_version: "2024-02-15-preview"
+```
+
+```bash
+# 環境変数に追加
+echo "AZURE_OPENAI_API_KEY=your_key_here" >> .env
+```
+
+**注意**: Azure AI Foundry統合は有料オプションです。基本的な脆弱性監視機能は無料のデータソースのみで動作します。
+
 ## 必要な準備
 
-### 1. FRED APIキーの取得
+### 1. FRED APIキーの取得（必須・無料）
 
 1. https://fred.stlouisfed.org/ にアクセス
 2. アカウント作成（無料）
@@ -47,71 +88,62 @@
 - 最低メモリ: 512MB
 - ストレージ: 初年度数十MB、長期で数GB
 
+### 3. Azure AI Foundry（オプション・有料）
+
+- Azure サブスクリプション
+- Azure OpenAI Service リソース
+- GPT-4デプロイメント
+
 ## セットアップ手順
 
-### 1. ファイルのアップロード
+### 基本セットアップ
 
-Synology File Stationで、プロジェクト全体をNASにアップロード（例: `/docker/goldsilver-monitor`）
-
-### 2. 環境変数の設定
+詳細は `DEPLOY.md` を参照してください。
 
 ```bash
+# 1. リポジトリをクローン
+git clone https://github.com/vega-field/goldsilver-monitor.git
+cd goldsilver-monitor
+
+# 2. 環境変数を設定
 cp .env.example .env
-# .envファイルを編集してFRED APIキーを設定
+nano .env  # FRED_API_KEYを設定
+
+# 3. Docker Composeで起動
+docker-compose up -d --build
+
+# 4. ログ確認
+docker-compose logs -f
 ```
 
-### 3. Container Managerでのデプロイ
+### Synology NAS へのデプロイ
 
-**方法A: Docker Composeを使用（推奨）**
-
-1. Container Manager → プロジェクト → 作成
-2. プロジェクト名: `goldsilver-monitor`
-3. パス: `/docker/goldsilver-monitor`
-4. docker-compose.ymlを選択
-5. 環境変数（.env）を設定
-6. 開始
-
-**方法B: 手動でコンテナ作成**
-
-```bash
-# SSH接続後
-cd /volume1/docker/goldsilver-monitor
-docker build -t goldsilver-monitor .
-docker run -d \
-  --name goldsilver-monitor \
-  -v $(pwd)/data:/data \
-  -v $(pwd)/config:/app/config:ro \
-  -v $(pwd)/reports:/reports \
-  -e FRED_API_KEY=your_key_here \
-  --restart unless-stopped \
-  goldsilver-monitor
-```
-
-### 4. 初回実行
-
-初回はニクソンショック以降の過去データ取得に10-20分かかります。
-
-```bash
-# ログ確認
-docker logs -f goldsilver-monitor
-```
+Container Manager を使用した詳細な手順は `DEPLOY.md` を参照してください。
 
 ## 運用方法
 
 ### 日次自動実行
 
-cron風のスケジューリング設定例（docker-compose.ymlで調整）:
+デフォルトで以下のスケジュールで自動実行されます：
 
-```yaml
-command: sh -c "while true; do python src/main.py && sleep 86400; done"
-```
-
-毎日午前2時実行（市場クローズ後）が推奨。
+- **日次**: データ更新、レポート生成、ログローテーション
+- **週次**: データベース最適化、バックアップ作成（日曜日）
+- **月次**: データローテーション、アーカイブクリーンアップ（毎月1日）
 
 ### 手動実行
 
 ```bash
+# 分析の即座実行
 docker exec goldsilver-monitor python src/main.py
+
+# データベース情報確認
+./maintenance.sh info
+
+# バックアップ作成
+./maintenance.sh backup
+
+# 完全メンテナンス
+./maintenance.sh full
 ```
 
 ### レポート確認
@@ -120,113 +152,35 @@ docker exec goldsilver-monitor python src/main.py
 
 ```
 reports/
-├── fragility_report_2024-12-13.md
-├── fragility_report_2024-12-14.md
+├── fragility_report_2024-12-15.md
+├── fragility_report_2024-12-16.md
 └── ...
 ```
 
 Obsidian vaultに`/reports`ディレクトリをシンボリックリンクすれば、自動的にノートとして参照可能。
 
-## データ構造
-
-### SQLiteデータベース
-
-`/data/market_data.db`に以下のテーブルが作成されます:
-
-- `price_data`: 金銀価格と比価
-- `macro_indicators`: マクロ経済指標
-- `analysis_results`: 日次分析結果
-
-### レポート形式
-
-Obsidianフロントマター付きMarkdown:
-
-```markdown
----
-date: 2024-12-13
-type: market-fragility-report
-fragility_level: MODERATE
-fragility_score: 55
-tags: [金銀比価, 市場脆弱性]
----
-
-# 金銀市場脆弱性レポート 🟡
-...
-```
-
 ## カスタマイズ
 
 ### 閾値の変更
 
-`config/config.yaml`で調整:
-
+`config/config.yaml`:
 ```yaml
 fragility_thresholds:
   gold_silver_ratio:
-    critical_high: 85  # お好みで変更
+    critical_high: 85  # あなたの基準に変更
     high: 80
+    low: 50
 ```
 
-### 通知の追加
-
-`src/alerts/`に新しいクラスを追加:
+### データソース追加
 
 ```python
-class SlackNotifier:
-    def send_alert(self, analysis_result):
-        # Webhook実装
-```
-
-### データソースの追加
-
-`src/data_sources/`に新しいクラスを追加:
-
-```python
+# src/data_sources/cftc_scraper.py
 class CFTCScraperSource(DataSource):
-    # CFTC投機筋ポジションのスクレイピング
+    def fetch(self, start_date, end_date):
+        # スクレイピング実装
+        pass
 ```
-
-## トラブルシューティング
-
-### FRED APIエラー
-
-```
-DataSourceError: FRED API key is required
-```
-
-→ `.env`ファイルでFRED_API_KEYが正しく設定されているか確認
-
-### Yahoo Financeエラー
-
-```
-Yahoo Finance data fetch failed
-```
-
-→ ネットワーク接続確認。一時的なAPI制限の可能性あり（数分待って再実行）
-
-### メモリ不足
-
-→ docker-compose.ymlでメモリ制限を緩和:
-
-```yaml
-deploy:
-  resources:
-    limits:
-      memory: 1G
-```
-
-## ロードマップ
-
-### Phase 2（予定）
-- [ ] CFTC投機筋ポジションのスクレイピング
-- [ ] ETFフロー監視
-- [ ] Grafanaダッシュボード
-- [ ] Slack/Discord通知
-
-### Phase 3（予定）
-- [ ] オプションIV監視
-- [ ] 機械学習による異常検知
-- [ ] バックテスト機能
 
 ## データベース運用
 
@@ -260,10 +214,85 @@ deploy:
 
 **Synology NASへの負荷は極小です**
 
+## トラブルシューティング
+
+### Q: "FRED API key is required"エラー
+
+A: `.env`ファイルが正しく設定されているか確認
+```bash
+cat .env
+# FRED_API_KEY=... が表示されるべき
+
+# コンテナ再起動
+docker-compose down
+docker-compose up -d
+```
+
+### Q: "Yahoo Finance data fetch failed"
+
+A: ネットワーク接続確認。一時的なAPI制限の可能性あり（数分待って再実行）
+
+### Q: メモリ不足エラー
+
+A: `docker-compose.yml`でメモリ制限を調整:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 1G  # 512M → 1Gに増加
+```
+
+## ロードマップ
+
+### Phase 1（現在）✅
+- [x] SQLiteベースのデータ蓄積
+- [x] 基本的な脆弱性分析
+- [x] Obsidianレポート生成
+- [x] 自動メンテナンス機能
+
+### Phase 2（計画中）
+- [ ] PostgreSQL + Grafana統合
+- [ ] CFTC投機筋ポジションのスクレイピング
+- [ ] ETFフロー監視
+- [ ] リアルタイムダッシュボード
+
+### Phase 3（構想段階）
+- [ ] オプションIV監視
+- [ ] 機械学習による異常検知
+- [ ] バックテスト機能
+- [ ] Azure AI Foundryの完全統合
+
+## アーキテクチャ
+
+### Phase 1: SQLite単体（現在）
+```
+goldsilver-monitor コンテナ
+├─ Python アプリ
+├─ SQLite (/data/market_data.db)
+└─ Obsidian Reports (/reports/)
+```
+
+### Phase 2: PostgreSQL + Grafana（計画中）
+```
+monitor コンテナ → postgres コンテナ → grafana コンテナ
+                    └─ 永続化データ    └─ ダッシュボード
+```
+
 ## ライセンス
 
 MIT License
 
-## 作者
+## 開発者
 
-Match - University of Tokyo CARF
+Match - University of Tokyo, Center for Advanced Research in Finance (CARF)
+
+## 参考資料
+
+- [QUICKSTART.md](QUICKSTART.md) - クイックスタートガイド
+- [DEPLOY.md](DEPLOY.md) - 詳細なデプロイ手順
+- [DATABASE_OPERATIONS.md](DATABASE_OPERATIONS.md) - データベース運用ガイド
+
+## 貢献
+
+Issue、Pull Requestを歓迎します。新しいデータソースの追加、分析手法の提案など、お気軽にご提案ください。
