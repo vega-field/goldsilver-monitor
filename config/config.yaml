@@ -1,26 +1,90 @@
-# サンプル設定ファイル（必要に応じてフィールドを追加）
+# 金銀市場脆弱性監視システム設定
+
+# データ取得設定
 data_sources:
-  yahoo:
-    enabled: true
-    tickers:
-      - "GC=F"   # Gold futures (Yahoo)
-      - "SI=F"   # Silver futures (Yahoo)
-    interval: "1d"
+  yahoo_finance:
+    symbols:
+      gold: GC=F  # Gold Futures
+      silver: SI=F  # Silver Futures
+    
   fred:
-    enabled: false
-    series:
-      - "GS10"
+    indicators:
+      tips_10y: DFII10  # 10-Year Treasury Inflation-Indexed Security
+      treasury_10y: DGS10  # 10-Year Treasury Constant Maturity Rate
+      breakeven_10y: T10YIE  # 10-Year Breakeven Inflation Rate
+      ism_pmi: NAPM  # ISM Manufacturing PMI
+      dollar_index: DTWEXBGS  # Trade Weighted U.S. Dollar Index
 
-analyzers:
-  fragility:
-    window_days: 30
-    volatility_window: 14
-    threshold:
-      warning: 0.7
-      critical: 0.9
+# 脆弱性検知の閾値
+fragility_thresholds:
+  gold_silver_ratio:
+    critical_high: 85  # 歴史的高値圏
+    high: 80
+    low: 50
+    critical_low: 45
+  
+  zscore:
+    extreme: 2.0  # ±2σ以上
+    high: 1.5
+    moderate: 1.0
+  
+  price_change:
+    daily_extreme: 5.0  # %
+    weekly_extreme: 10.0  # %
 
-alerts:
-  obsidian:
+# アラートレベル定義
+alert_levels:
+  CRITICAL: 90  # 複数指標が極端値
+  HIGH: 70
+  MODERATE: 50
+  LOW: 30
+
+# 統計計算設定
+statistics:
+  lookback_period: 252  # 1年分の営業日
+  zscore_window: 252
+  ma_short: 20  # 短期移動平均
+  ma_long: 50  # 長期移動平均
+
+# レポート出力設定
+reports:
+  output_dir: /reports
+  format: markdown
+  obsidian_compatible: true
+  daily_summary: true
+  
+# 歴史データ取得範囲
+historical_data:
+  start_date: "1971-08-15"  # ニクソンショック
+  
+# ログ設定
+logging:
+  level: INFO
+  file: /data/monitor.log
+  max_size_mb: 10
+  keep_files: 5
+
+# データベース管理設定
+database_management:
+  # データローテーション
+  rotation:
     enabled: true
-    vault_path: "${OBSIDIAN_VAULT_PATH:-}"
-    notes_dir: "goldsilver-alerts"
+    retention_days: 730  # 2年間保持
+    analysis_retention_days: 90  # 分析結果は3ヶ月保持
+  
+  # バックアップ
+  backup:
+    enabled: true
+    keep_backups: 7  # 過去7日分保持
+    weekly: true  # 週次バックアップ
+  
+  # 最適化
+  optimization:
+    enabled: true
+    weekly: true  # 週次VACUUM/ANALYZE
+  
+  # アーカイブクリーンアップ
+  archive_cleanup:
+    enabled: true
+    max_age_days: 3650  # 10年以上前のアーカイブを削除
+    monthly: true

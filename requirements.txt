@@ -1,17 +1,6 @@
-# 基本依存パッケージ
-pyyaml
-requests
-pandas
-numpy
-python-dotenv
-
-# データソース
-yfinance
-fredapi
-
-# Azure SDK（使用する具体的なパッケージをプロジェクトで選んでください）
-azure-identity
-azure-ai-language
-
-# 開発/ユーティリティ
-loguru
+yfinance==0.2.33
+pandas==2.1.4
+numpy==1.26.2
+fredapi==0.5.1
+pyyaml==6.0.1
+python-dateutil==2.8.2

@@ -1,15 +1,28 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  app:
+  monitor:
     build: .
-    image: goldsilver-monitor:latest
     container_name: goldsilver-monitor
-    env_file:
-      - .env
     volumes:
+      - ./data:/data
       - ./config:/app/config:ro
-      - ./src:/app/src:ro
-      - ./data:/app/data
+      - ./reports:/reports
+    environment:
+      - TZ=Asia/Tokyo
+      - FRED_API_KEY=${FRED_API_KEY}
     restart: unless-stopped
-    command: ["/app/run.sh"]
+    # 日次実行: 毎日午前2時（市場クローズ後）
+    # cronを使う場合は以下のようにエントリーポイントを変更
+    # command: sh -c "while true; do python src/main.py && sleep 86400; done"
+    
+  # オプション: 可視化用のGrafana（後で追加可能）
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+
+# volumes:
+#   grafana-data:
